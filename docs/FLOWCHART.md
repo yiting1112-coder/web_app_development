@@ -1,87 +1,100 @@
-# 系統流程圖與使用者操作路徑 (Flowcharts) - 食譜收藏夾系統
+# 線上桌遊系統 FLOWCHART 流程圖
 
-以下文件根據現有的 [PRD.md](./PRD.md) 和 [ARCHITECTURE.md](./ARCHITECTURE.md) 設計，透過視覺化圖表釐清使用者的操作路徑與後端的資料流，並定義出各個功能的對應路由。
+本文件依據 [產品需求文件 (PRD)](PRD.md) 與 [系統架構文件 (ARCHITECTURE)](ARCHITECTURE.md)，為線上桌遊系統設計使用者操作流程與核心系統互動的資料流。
+
+---
 
 ## 1. 使用者流程圖（User Flow）
 
-此流程圖呈現一般使用者從進入網站開始，可能採取的各項操作行為。包含了「身份驗證」、「瀏覽與搜尋」以及「食譜管理」等核心情境。
+描述玩家從進入網站開始，建立/加入房間，進入遊戲並執行相關回合操作的核心路徑。
 
 ```mermaid
-flowchart TD
-  A([使用者開啟網頁]) --> B[首頁 / 搜尋入口]
-
-  %% 搜尋與瀏覽分支
-  B --> C{選擇搜尋方式}
-  C -->|關鍵字搜尋| D[食譜列表頁]
-  C -->|食材組合過濾| E[對應食材食譜列表頁]
-  
-  D --> F[單一食譜詳情頁]
-  E --> F
-  
-  %% 會員與登入分支
-  B --> G{會員狀態}
-  G -->|未登入| H[登入/註冊頁面]
-  H -->|成功| B
-  
-  G -->|已登入| I[會員中心 / 我的收藏]
-  I --> J{操作項目}
-  
-  %% 增刪改查分支
-  J -->|新增| K[填寫新建食譜表單]
-  K -->|儲存| L([資料庫處理並重導覽])
-  L --> F
-  
-  J -->|查看與管理個人食譜| D
-  D -->|若為自己擁有的食譜| M{編輯或刪除?}
-  M -->|編輯| N[填寫編輯食譜表單]
-  N -->|儲存| L
-  M -->|刪除| O([確認刪除重導向])
-  O --> I
+flowchart LR
+    A([玩家開心開啟網站]) --> B{是否已登入？}
+    B -->|否| C[登入/註冊頁面]
+    C --> D[驗證身份]
+    D -->|成功| E[遊戲大廳 Lobby]
+    B -->|是| E
+    
+    E --> F{選擇房間操作}
+    F -->|建立房間| G[取得邀請碼並進入準備區]
+    F -->|輸入邀請碼| H[加入朋友的房間準備區]
+    
+    G --> I{房主點擊開始遊戲}
+    H --> I
+    
+    I --> J[進入遊戲主要面板 Board]
+    J --> K{輪到我的回合了嗎？}
+    
+    K -->|否| L[看著別人玩 / 發送文字訊息]
+    L --> K
+    
+    K -->|是| M{選擇操作動作}
+    M --> N[抽牌/發牌]
+    M --> O[發起資源交換請求]
+    M --> P[策略佈局 (出牌/消耗資源)]
+    
+    N --> Q[結束回合]
+    O --> Q
+    P --> Q
+    
+    Q --> R[輪到下一位玩家]
+    R --> K
 ```
+
+---
 
 ## 2. 系統序列圖（Sequence Diagram）
 
-此圖以「**使用者新增食譜**」這項操作為例，詳細描繪了整個系統後端（MVC 架構）的運作順序——從網頁送出請求到資料庫存取並回傳重新導向的流程。
+以下序列圖描述了玩家在遊戲中**點擊並確認一項回合操作（例如：消耗資源來出牌或發起資源交換）**，到資料庫檢查與更新最新狀態的完整流程。
 
 ```mermaid
 sequenceDiagram
-  actor User as 使用者
-  participant Browser as 瀏覽器
-  participant Route as Flask Route (Controller)
-  participant Model as Model (資料庫互動層)
-  participant DB as SQLite DB
-  
-  User->>Browser: 填寫「新增食譜表單」並點擊送出
-  Browser->>Route: 發送 POST /recipes 請求 (夾帶表單資料)
-  
-  Route->>Route: 1. 驗證使用者是否已登入
-  Route->>Route: 2. 驗證表單輸入 (如：標題是否空白)
-  
-  Route->>Model: 呼叫 Recipe.create(data)
-  Model->>DB: 執行 INSERT INTO recipes ...
-  DB-->>Model: 回傳新記錄的建立狀態 (ID)
-  Model-->>Route: 回傳新建食譜的物件
-  
-  Route-->>Browser: 回傳 HTTP 302 Redirect 重導向至 /recipes/{id} (詳情頁)
-  Browser->>User: 顯示已成功新增的食譜頁面
+    actor User as 玩家
+    participant Browser as 瀏覽器 (JS Polling & UI)
+    participant Flask as Flask Route (Controller)
+    participant Model as Game Model (Logic)
+    participant DB as SQLite 資料庫
+
+    User->>Browser: 點選「消耗資源出牌」按鈕
+    Browser->>Flask: POST /game/room_123/action (挾帶動作資料)
+    
+    Flask->>Model: 呼叫 `execute_action(user_id, action_data)`
+    Model->>DB: 查詢玩家資源餘額與當前回合狀態
+    DB-->>Model: 回傳玩家資料與回合歸屬
+    
+    alt 不是該玩家的回合 或 資源不足
+        Model-->>Flask: 驗證失敗 (回傳錯誤代碼)
+        Flask-->>Browser: JSON Error (HTTP 400 資源不足)
+        Browser-->>User: 畫面提示「資源不足或不是你的回合」
+    else 驗證成功
+        Model->>DB: UPDATE 更新資源餘額與卡牌狀態
+        Model->>DB: INSERT into GameLog 增加一筆歷史事件
+        DB-->>Model: 更新成功
+        Model-->>Flask: 回傳操作成功事件
+        Flask-->>Browser: JSON Success (HTTP 200)
+        Browser-->>User: 動畫提示出牌成功，畫面更新
+    end
 ```
+
+---
 
 ## 3. 功能清單對照表
 
-本清單列出未來將實作的功能，以及對應的 URL 路徑 (Routes) 和 HTTP 請求方法。由於原生 HTML 表單僅支援 GET 與 POST，故我們在更新/刪除資源時會透過 `POST` 方法加上特定後綴路徑來實作。
+對應整個應用程式的畫面與操作，我們規劃以下路由及對應方法。
 
-| 功能模塊 | 具體功能描述 | HTTP 方法 | URL 路徑 (Route) | 備註 |
-| --- | --- | --- | --- | --- |
-| **公開瀏覽** | 網站首頁 | GET | `/` | 顯示搜尋框與推薦食譜 |
-| | 食譜列表與搜尋結果 | GET | `/recipes` | 若帶有 `?q=` 參數則為關鍵字搜尋 |
-| | 食材組合過濾搜尋 | GET | `/recipes/search_by_ingredients` | 依據選擇的多樣食材進行過濾 |
-| | 檢視單一食譜詳情 | GET | `/recipes/<int:recipe_id>` | 查看公開的食譜 |
-| **會員管理** | 註冊帳號頁面與處理 | GET / POST | `/register` | 包含頁面渲染(GET)與表單送出(POST) |
-| | 登入頁面與處理 | GET / POST | `/login` | 驗證帳密並建立 Session |
-| | 登出處理 | GET | `/logout` | 清除使用者 Session |
-| **食譜管理<br>(需登入)** | 新增食譜頁面 | GET | `/recipes/new` | 提供空白輸入表單 |
-| | 儲存新食譜資料 | POST | `/recipes` | 將表單接收並寫入資料庫 |
-| | 編輯食譜頁面 | GET | `/recipes/<int:recipe_id>/edit` | 將既有資料填入表單讓使用者修改 |
-| | 儲存修改的食譜 | POST | `/recipes/<int:recipe_id>/update` | 儲存使用者更新的資料 |
-| | 刪除食譜 | POST | `/recipes/<int:recipe_id>/delete` | 驗證擁有者身分或管理員權限後刪除 |
-| **後台管理** | 管理員儀表板 | GET | `/admin` | 僅允許管理員檢視全域食譜與用戶列表 |
+| 功能名稱 | URL 路徑 | HTTP 方法 | 描述 |
+| :--- | :--- | :--- | :--- |
+| **首頁 / 登入頁** | `/` | GET | 渲染系統首頁與登入介面 |
+| **用戶註冊** | `/auth/register` | POST | 接收表單並建立新用戶帳號 |
+| **用戶登入** | `/auth/login` | POST | 驗證密碼建立 Session |
+| **登出** | `/auth/logout` | GET / POST | 清除玩家的登入 Session |
+| **遊戲大廳** | `/lobby` | GET | 查看目前個人狀態，渲染加入/建立房間的介面 |
+| **建立房間** | `/room/create` | POST | 在資料庫建立一筆新房間資料，回傳邀請碼 |
+| **加入房間** | `/room/join` | POST | 驗證邀請碼，將玩家加入該房間 |
+| **遊戲主頁面** | `/game/<room_id>` | GET | 渲染 Jinja2 的桌遊面板佈局 |
+| **獲取遊戲狀態** | `/game/<room_id>/state`| GET | (Polling) 取得最新的遊戲回合、資源、對話與Log狀態 |
+| **玩家行動** | `/game/<room_id>/action`| POST | 執行核心遊戲動作 (如：抽牌、打卡、資源升級) |
+| **資源交換** | `/game/<room_id>/trade` | POST | 發起與其他玩家的資源交易請求 |
+| **發送訊息** | `/game/<room_id>/chat` | POST | 在遊戲對話框內發言 |
+| **結束回合** | `/game/<room_id>/end` | POST | 將回合交接給下一位輪替順位的玩家 |
