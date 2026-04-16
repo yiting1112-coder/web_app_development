@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row min-vh-75 align-items-center justify-content-center py-5">
+    <div class="col-lg-5 text-center text-lg-start mb-5 mb-lg-0 pe-lg-5 animate-fade-in" style="animation-delay: 0.1s;">
+        <h1 class="display-3 fw-bold mb-4 bg-gradient-text" style="background: linear-gradient(to right, #60a5fa, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">重定義，桌遊狂熱。</h1>
+        <p class="lead text-secondary mb-5">
+            隨時隨地開啟你的卡牌戰場，與好友遠端連線、資源無縫交換。沉浸式玻璃黑體視覺，完美的擬真回合機制，現在立刻加入！
+        </p>
+    </div>
+    
+    <div class="col-lg-5 col-md-8 mx-auto animate-fade-in" style="animation-delay: 0.2s;">
+        <!-- Pills -->
+        <ul class="nav nav-pills mb-4 justify-content-center" id="authTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active px-4 rounded-pill" id="login-tab" data-bs-toggle="pill" data-bs-target="#login" type="button" role="tab">登入</button>
+            </li>
+            <li class="nav-item ms-2" role="presentation">
+                <button class="nav-link px-4 rounded-pill" id="register-tab" data-bs-toggle="pill" data-bs-target="#register" type="button" role="tab">建立帳號</button>
+            </li>
+        </ul>
+
+        <!-- Content -->
+        <div class="tab-content" id="authTabsContent">
+            <!-- Login -->
+            <div class="tab-pane fade show active" id="login" role="tabpanel">
+                <div class="glass-card">
+                    <h3 class="mb-4 fw-bold">歡迎回來</h3>
+                    <form action="{{ url_for('auth.login') }}" method="POST">
+                        <div class="mb-3">
+                            <label class="form-label text-secondary small text-uppercase fw-bold">艦長代號 (帳號)</label>
+                            <input type="text" class="form-control form-control-lg" name="username" required placeholder="例如：Antigravity">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label text-secondary small text-uppercase fw-bold">存取密碼</label>
+                            <input type="password" class="form-control form-control-lg" name="password" required placeholder="••••••••">
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 btn-lg shadow-sm">立即連線 <i class="bi bi-rocket-takeoff ms-2"></i></button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Register -->
+            <div class="tab-pane fade" id="register" role="tabpanel">
+                <div class="glass-card">
+                    <h3 class="mb-4 fw-bold">新玩家檔案登錄</h3>
+                    <form action="{{ url_for('auth.register') }}" method="POST">
+                        <div class="mb-3">
+                            <label class="form-label text-secondary small text-uppercase fw-bold">想要的代號</label>
+                            <input type="text" class="form-control form-control-lg" name="username" required placeholder="想一個響亮的名稱">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label text-secondary small text-uppercase fw-bold">防護密碼</label>
+                            <input type="password" class="form-control form-control-lg" name="password" required placeholder="至少包含英文與數字">
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 btn-lg shadow-sm">免費註冊</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .nav-pills .nav-link { color: var(--text-secondary); font-weight: 600; }
+    .nav-pills .nav-link.active { background-color: var(--glass-bg); border: 1px solid var(--glass-border); color: white; }
+</style>
+{% endblock %}

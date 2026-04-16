@@ -1,129 +1,180 @@
+import sqlite3
 from app.models import get_db_connection
 
-def add_resource(player_id, resource_type, amount):
+# ---- Resources ----
+def create_resource(data):
+    """
+    操作資源。給定 player_id 增加某種資源。
+    data: {'player_id': 1, 'resource_type': 'wood', 'amount': 1}
+    """
     conn = get_db_connection()
-    cursor = conn.cursor()
-    resource = cursor.execute("SELECT * FROM resources WHERE player_id = ? AND resource_type = ?", (player_id, resource_type)).fetchone()
-    if resource:
-        cursor.execute("UPDATE resources SET amount = amount + ? WHERE id = ?", (amount, resource['id']))
-    else:
-        cursor.execute("INSERT INTO resources (player_id, resource_type, amount) VALUES (?, ?, ?)", (player_id, resource_type, amount))
-    conn.commit()
-    conn.close()
-
-def reduce_resource(player_id, resource_type, amount):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    resource = cursor.execute("SELECT * FROM resources WHERE player_id = ? AND resource_type = ?", (player_id, resource_type)).fetchone()
-    if resource and resource['amount'] >= amount:
-        cursor.execute("UPDATE resources SET amount = amount - ? WHERE id = ?", (amount, resource['id']))
+    try:
+        cursor = conn.cursor()
+        resource = cursor.execute("SELECT * FROM resources WHERE player_id = ? AND resource_type = ?", 
+                                  (data['player_id'], data['resource_type'])).fetchone()
+        if resource:
+            cursor.execute("UPDATE resources SET amount = amount + ? WHERE id = ?", 
+                           (data['amount'], resource['id']))
+        else:
+            cursor.execute("INSERT INTO resources (player_id, resource_type, amount) VALUES (?, ?, ?)", 
+                           (data['player_id'], data['resource_type'], data['amount']))
         conn.commit()
-        success = True
-    else:
-        success = False
-    conn.close()
-    return success
+        return True
+    except sqlite3.Error as e:
+        print(f"Error adding resource: {e}")
+        return False
+    finally:
+        conn.close()
 
-def get_player_resources(player_id):
+def update_resource(id, data):
+    """
+    減少或更新物資 (可以直接指定數量扣除)。
+    """
     conn = get_db_connection()
-    resources = conn.execute("SELECT * FROM resources WHERE player_id = ?", (player_id,)).fetchall()
-    conn.close()
-    return [dict(r) for r in resources]
+    try:
+        if data.get('action') == 'reduce':
+            cursor = conn.cursor()
+            resource = cursor.execute("SELECT * FROM resources WHERE id = ?", (id,)).fetchone()
+            if resource and resource['amount'] >= data['amount']:
+                cursor.execute("UPDATE resources SET amount = amount - ? WHERE id = ?", 
+                               (data['amount'], id))
+                conn.commit()
+                return True
+            return False
+    except sqlite3.Error as e:
+        print(f"Error updating resource: {e}")
+        return False
+    finally:
+        conn.close()
 
-def create_card(room_id, card_type, status='deck', owner_id=None):
+def get_all_by_player(player_id):
+    """取得玩家的所有資源清單"""
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO cards (room_id, owner_id, card_type, status) VALUES (?, ?, ?, ?)", 
-                   (room_id, owner_id, card_type, status))
-    conn.commit()
-    card_id = cursor.lastrowid
-    conn.close()
-    return card_id
+    try:
+        resources = conn.execute("SELECT * FROM resources WHERE player_id = ?", (player_id,)).fetchall()
+        return [dict(r) for r in resources]
+    except sqlite3.Error as e:
+        return []
+    finally:
+        conn.close()
 
-def draw_card(room_id, player_id):
+# ---- Cards ----
+def create_card(data):
+    """
+    新增一張卡牌。data: {'room_id', 'card_type', 'status', 'owner_id' (optional)}
+    """
     conn = get_db_connection()
-    cursor = conn.cursor()
-    card = cursor.execute("SELECT * FROM cards WHERE room_id = ? AND status = 'deck' LIMIT 1", (room_id,)).fetchone()
-    if card:
-        cursor.execute("UPDATE cards SET status = 'hand', owner_id = ? WHERE id = ?", (player_id, card['id']))
+    try:
+        cursor = conn.cursor()
+        owner_id = data.get('owner_id')
+        cursor.execute("INSERT INTO cards (room_id, owner_id, card_type, status) VALUES (?, ?, ?, ?)", 
+                       (data['room_id'], owner_id, data['card_type'], data.get('status', 'deck')))
         conn.commit()
-        ret = dict(card)
-        ret['status'] = 'hand'
-        ret['owner_id'] = player_id
-    else:
-        ret = None
-    conn.close()
-    return ret
+        return cursor.lastrowid
+    except sqlite3.Error as e:
+        print(f"Error creating card: {e}")
+        return None
+    finally:
+        conn.close()
 
-def get_player_cards(player_id):
+def get_cards_by_player(player_id):
+    """取得該玩家手上的卡牌"""
     conn = get_db_connection()
-    cards = conn.execute("SELECT * FROM cards WHERE owner_id = ? AND status = 'hand'", (player_id,)).fetchall()
-    conn.close()
-    return [dict(c) for c in cards]
+    try:
+        cards = conn.execute("SELECT * FROM cards WHERE owner_id = ? AND status = 'hand'", (player_id,)).fetchall()
+        return [dict(c) for c in cards]
+    except sqlite3.Error as e:
+        return []
+    finally:
+        conn.close()
 
-def play_card(card_id):
+def update_card(id, data):
+    """更改卡片狀態 (例如抽出或打出)"""
     conn = get_db_connection()
-    conn.execute("UPDATE cards SET status = 'played' WHERE id = ?", (card_id,))
-    conn.commit()
-    conn.close()
+    try:
+        updates = []
+        params = []
+        if 'status' in data:
+            updates.append("status = ?")
+            params.append(data['status'])
+        if 'owner_id' in data:
+            updates.append("owner_id = ?")
+            params.append(data['owner_id'])
+            
+        params.append(id)
+        if updates:
+            conn.execute(f"UPDATE cards SET {', '.join(updates)} WHERE id = ?", params)
+            conn.commit()
+        return True
+    except sqlite3.Error as e:
+        print(f"Error updating card: {e}")
+        return False
+    finally:
+        conn.close()
 
-def add_game_log(room_id, user_id, action):
+# ---- Trade Requests ----
+def create_trade(data):
+    """新增交易請求。data: {room_id, offerer_id, target_id, offer_resource, offer_amount, request_resource, request_amount}"""
     conn = get_db_connection()
-    conn.execute("INSERT INTO game_logs (room_id, user_id, action) VALUES (?, ?, ?)", (room_id, user_id, action))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO trade_requests 
+            (room_id, offerer_id, target_id, offer_resource, offer_amount, request_resource, request_amount)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (data['room_id'], data['offerer_id'], data.get('target_id'), 
+              data['offer_resource'], data['offer_amount'], data['request_resource'], data['request_amount']))
+        conn.commit()
+        return cursor.lastrowid
+    except sqlite3.Error as e:
+        print(f"Error creating trade: {e}")
+        return None
+    finally:
+        conn.close()
 
-def get_game_logs(room_id):
+def update_trade(id, data):
+    """更新交易狀態。data: {'status': 'accepted', ...}"""
     conn = get_db_connection()
-    logs = conn.execute("""
-        SELECT gl.*, u.username 
-        FROM game_logs gl
-        LEFT JOIN users u ON gl.user_id = u.id
-        WHERE gl.room_id = ?
-        ORDER BY gl.created_at ASC
-    """, (room_id,)).fetchall()
-    conn.close()
-    return [dict(l) for l in logs]
+    try:
+        conn.execute("UPDATE trade_requests SET status = ? WHERE id = ?", (data['status'], id))
+        conn.commit()
+        return True
+    except sqlite3.Error as e:
+        return False
+    finally:
+        conn.close()
 
-def add_chat_message(room_id, user_id, message):
+def get_trades_by_room(room_id):
     conn = get_db_connection()
-    conn.execute("INSERT INTO chat_messages (room_id, user_id, message) VALUES (?, ?, ?)", (room_id, user_id, message))
-    conn.commit()
-    conn.close()
+    try:
+        trades = conn.execute("SELECT * FROM trade_requests WHERE room_id = ? AND status = 'pending'", (room_id,)).fetchall()
+        return [dict(t) for t in trades]
+    except sqlite3.Error:
+        return []
+    finally:
+        conn.close()
 
-def get_chat_messages(room_id):
+# ---- Logs & Chat ----
+def create_log(data):
     conn = get_db_connection()
-    msgs = conn.execute("""
-        SELECT cm.*, u.username 
-        FROM chat_messages cm
-        JOIN users u ON cm.user_id = u.id
-        WHERE cm.room_id = ?
-        ORDER BY cm.created_at ASC
-    """, (room_id,)).fetchall()
-    conn.close()
-    return [dict(m) for m in msgs]
+    try:
+        conn.execute("INSERT INTO game_logs (room_id, user_id, action) VALUES (?, ?, ?)", 
+                     (data['room_id'], data.get('user_id'), data['action']))
+        conn.commit()
+        return True
+    except sqlite3.Error as e:
+        return False
+    finally:
+        conn.close()
 
-def create_trade_request(room_id, offerer_id, target_id, offer_resource, offer_amount, request_resource, request_amount):
+def create_chat(data):
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO trade_requests 
-        (room_id, offerer_id, target_id, offer_resource, offer_amount, request_resource, request_amount)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (room_id, offerer_id, target_id, offer_resource, offer_amount, request_resource, request_amount))
-    conn.commit()
-    trade_id = cursor.lastrowid
-    conn.close()
-    return trade_id
-
-def get_pending_trades(room_id):
-    conn = get_db_connection()
-    trades = conn.execute("SELECT * FROM trade_requests WHERE room_id = ? AND status = 'pending'", (room_id,)).fetchall()
-    conn.close()
-    return [dict(t) for t in trades]
-
-def update_trade_status(trade_id, status):
-    conn = get_db_connection()
-    conn.execute("UPDATE trade_requests SET status = ? WHERE id = ?", (status, trade_id))
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("INSERT INTO chat_messages (room_id, user_id, message) VALUES (?, ?, ?)", 
+                     (data['room_id'], data['user_id'], data['message']))
+        conn.commit()
+        return True
+    except sqlite3.Error:
+        return False
+    finally:
+        conn.close()

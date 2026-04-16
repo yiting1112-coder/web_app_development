@@ -8,7 +8,7 @@ def game_board(room_id):
     渲染遊戲核心面板 (board.html)。
     驗證 session 使用者是否確實屬於此房間的遊戲名單，若否則回傳 403 並建議退回首頁。
     """
-    pass
+    return f"進入遊戲房間 {room_id} 的畫面準備開發中"
 
 @game_bp.route('/<int:room_id>/state', methods=['GET'])
 def get_game_state(room_id):

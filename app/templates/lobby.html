@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mt-5 justify-content-center">
+    <div class="col-12 text-center mb-5 animate-fade-in">
+        <h2 class="display-5 fw-bold bg-gradient-text" style="background: linear-gradient(to right, #34d399, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">連線大廳</h2>
+        <p class="text-secondary lead">準備好迎接下一場決策激鬥了嗎，<strong class="text-white">{{ username }}</strong>？</p>
+    </div>
+
+    <!-- 建立房間 -->
+    <div class="col-md-5 animate-fade-in" style="animation-delay: 0.1s;">
+        <div class="glass-card h-100 d-flex flex-column text-center">
+            <div class="mb-auto">
+                <div class="display-3 mb-4 text-primary">
+                    <i class="bi bi-box-fill"></i>
+                </div>
+                <h3 class="fw-bold mb-3">發起新局</h3>
+                <p class="text-secondary mb-4">建立一場專屬的空間。我們將為你配置獨一無二的隨機邀請暗碼，隨時可以招募朋友進來。</p>
+            </div>
+            <form action="{{ url_for('room.create_room') }}" method="POST">
+                <button type="submit" class="btn btn-primary btn-lg w-100">建立專屬房間 <i class="bi bi-chevron-right ms-1"></i></button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-md-2 d-flex align-items-center justify-content-center py-4 my-md-0 my-y animate-fade-in" style="animation-delay: 0.2s;">
+        <div class="rounded-circle border border-secondary text-secondary d-flex align-items-center justify-content-center fw-bold" style="width: 50px; height: 50px; background: rgba(255,255,255,0.05);">OR</div>
+    </div>
+
+    <!-- 加入房間 -->
+    <div class="col-md-5 animate-fade-in" style="animation-delay: 0.3s;">
+        <div class="glass-card h-100 d-flex flex-column text-center">
+            <div class="mb-auto">
+                <div class="display-3 mb-4 text-info">
+                    <i class="bi bi-controller"></i>
+                </div>
+                <h3 class="fw-bold mb-3">加入戰線</h3>
+                <p class="text-secondary mb-4">輸入夥伴發給你的「6 碼字母邀請碼」，立刻連線進入他們的虛擬宇宙同樂。</p>
+            </div>
+            <form action="{{ url_for('room.join_room') }}" method="POST">
+                <div class="input-group input-group-lg mb-4">
+                    <span class="input-group-text bg-transparent border-end-0 border-secondary text-white"><i class="bi bi-key-fill"></i></span>
+                    <input type="text" class="form-control border-start-0 text-center fw-bold letter-spacing-2" name="invite_code" required placeholder="例如：A1B2C3" maxlength="6" style="text-transform: uppercase;">
+                </div>
+                <button type="submit" class="btn btn-outline-info btn-lg w-100 fw-bold" style="border: 2px solid #0dcaf0; background: rgba(13,202,240,0.1); color: #0dcaf0;">連線進入 <i class="bi bi-box-arrow-in-right ms-1"></i></button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
